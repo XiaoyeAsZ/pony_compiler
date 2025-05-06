@@ -1,24 +1,25 @@
-//===- Lexer.h - Lexer for the Pony language -------------------------------===//
+//===- Lexer.h - Lexer for the Pony language
+//-------------------------------===//
 
 #ifndef PONY_LEXER_H
 #define PONY_LEXER_H
 
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include <vector>
-#include <memory>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
+
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace pony {
 
 /// Structure definition a location in a file.
 struct Location {
-  std::shared_ptr<std::string> file; ///< filename.
-  int line;                          ///< line number.
-  int col;                           ///< column number.
+  std::shared_ptr<std::string> file;  ///< filename.
+  int line;                           ///< line number.
+  int col;                            ///< column number.
 };
 
 // List of Token returned by the lexer.
@@ -48,7 +49,7 @@ enum Token : int {
 /// can proceed by reading the next line from the standard input or from a
 /// memory mapped file.
 class Lexer {
-public:
+ public:
   /// Create a lexer for the given filename. The filename is kept only for
   /// debugging purpose (attaching a location to a Token).
   Lexer(std::string filename)
@@ -76,7 +77,6 @@ public:
   }
 
   double getValue() {
-
     assert(curTok == tok_number);
     return numVal;
   }
@@ -90,24 +90,26 @@ public:
   // Return the current column in the file.
   int getCol() { return curCol; }
 
-private:
+ private:
   /// Delegate to a derived class fetching the next line. Returns an empty
   /// string to signal end of file (EOF). Lines are expected to always finish
   /// with "\n"
   virtual llvm::StringRef readNextLine() = 0;
 
-
   // TODO: Implement function getNextChar().
-  
-  // Function description: 该函数从curLineBuffer中获取当前行的下一个char，如果已经处理到当前行最后一个char，则通过读取下一行
+
+  // Function description:
+  // 该函数从curLineBuffer中获取当前行的下一个char，如果已经处理到当前行最后一个char，则通过读取下一行
   //                       来更新curLineBuffer以确保curLineBuffer非空。
 
   // Hints: 1. 函数实现过程中可能会用到lexer的部分成员变量（如curLineBuffer）；
-  //        2. 注意读到文档结尾，读到某一行结尾等特殊情况的处理。一般来说，读到文档结尾应返回EOF，某一行结尾最后一个char为'\n'；
+  //        2.
+  //        注意读到文档结尾，读到某一行结尾等特殊情况的处理。一般来说，读到文档结尾应返回EOF，某一行结尾最后一个char为'\n'；
   //        3. 注意行列位置信息的同步更新；
-  //        4. 关于llvm::StringRef的部分函数：llvm::StringRef example; example.front(); example.drop_front(); example.empty()。
+  //        4. 关于llvm::StringRef的部分函数：llvm::StringRef example;
+  //        example.front(); example.drop_front(); example.empty()。
   int getNextChar() {
-    /* 
+    /*
      *
      *  Write your code here.
      *
@@ -117,8 +119,7 @@ private:
   ///  Return the next token from standard input.
   Token getTok() {
     // Skip any whitespace.
-    while (isspace(lastChar))
-      lastChar = Token(getNextChar());
+    while (isspace(lastChar)) lastChar = Token(getNextChar());
 
     // Save the current location before reading the token characters.
     lastLocation.line = curLineNum;
@@ -132,17 +133,19 @@ private:
     //          • 按照使用习惯，标识符中不能出现连续的下划线；
     //          • 按照使用习惯，要求标识符中有数字时，数字须位于标识符末尾
     //          例如：有效的标识符可以是 a123, b_4, placeholder 等。
-    //       3. 在识别每种Token的同时，将其存放在某种数据结构中，以便最终在终端输出
+    //       3.
+    //       在识别每种Token的同时，将其存放在某种数据结构中，以便最终在终端输出
     //
     // Hints: 1. 在实现第1，2点时，可参考getTok()函数中现有的识别数字的方法。
     //        2. 一些有用的函数:  isalpha(); isalnum();
-    /* 
+    /*
      *
      *  Write your code here.
      *
      */
 
-    //TODO: 3. 改进识别数字的方法，使编译器可以识别并在终端报告非法数字，非法表示包括：9.9.9，9..9，.999，..9，9..等。
+    // TODO: 3.
+    // 改进识别数字的方法，使编译器可以识别并在终端报告非法数字，非法表示包括：9.9.9，9..9，.999，..9，9..等。
     if (isdigit(lastChar) || lastChar == '.') {
       std::string numStr;
       do {
@@ -160,13 +163,11 @@ private:
         lastChar = Token(getNextChar());
       } while (lastChar != EOF && lastChar != '\n' && lastChar != '\r');
 
-      if (lastChar != EOF)
-        return getTok();
+      if (lastChar != EOF) return getTok();
     }
 
     // Check for end of file.  Don't eat the EOF.
-    if (lastChar == EOF)
-      return tok_eof;
+    if (lastChar == EOF) return tok_eof;
 
     // Otherwise, just return the character as its ascii value.
     Token thisChar = Token(lastChar);
@@ -199,29 +200,26 @@ private:
 
   /// Buffer supplied by the derived class on calls to `readNextLine()`
   llvm::StringRef curLineBuffer = "\n";
-
 };
 
 /// A lexer implementation operating on a buffer in memory.
 class LexerBuffer final : public Lexer {
-public:
+ public:
   LexerBuffer(const char *begin, const char *end, std::string filename)
       : Lexer(std::move(filename)), current(begin), end(end) {}
 
-private:
+ private:
   /// Provide one line at a time to the Lexer, return an empty string when
   /// reaching the end of the buffer.
   llvm::StringRef readNextLine() override {
     auto *begin = current;
-    while (current <= end && *current && *current != '\n')
-      ++current;
-    if (current <= end && *current)
-      ++current;
+    while (current <= end && *current && *current != '\n') ++current;
+    if (current <= end && *current) ++current;
     llvm::StringRef result{begin, static_cast<size_t>(current - begin)};
     return result;
   }
   const char *current, *end;
 };
-} // namespace pony
+}  // namespace pony
 
-#endif // PONY_LEXER_H
+#endif  // PONY_LEXER_H

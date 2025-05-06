@@ -1,4 +1,4 @@
-# Install script for directory: /root/src/pony/include
+# Install script for directory: /home/workspace/pony_compiler/src/pony/include
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,13 +37,9 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  # Include the install script for the subdirectory.
-  include("/root/src/build/pony/include/pony/cmake_install.cmake")
+  # Include the install script for each subdirectory.
+  include("/home/workspace/pony_compiler/src/build/pony/include/pony/cmake_install.cmake")
+
 endif()
 

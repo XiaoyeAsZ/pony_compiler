@@ -1,4 +1,5 @@
-//===- ponyc.cpp - The Pony Compiler ----------------------------------------===//
+//===- ponyc.cpp - The Pony Compiler
+//----------------------------------------===//
 //
 //===----------------------------------------------------------------------===//
 //
@@ -6,11 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "pony/Dialect.h"
-#include "pony/MLIRGen.h"
-#include "pony/Parser.h"
-#include "pony/Passes.h"
-
+#include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -25,15 +29,10 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Transforms/Passes.h"
-
-#include "llvm/ADT/StringRef.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/ErrorOr.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
+#include "pony/Dialect.h"
+#include "pony/MLIRGen.h"
+#include "pony/Parser.h"
+#include "pony/Passes.h"
 
 using namespace pony;
 namespace cl = llvm::cl;
@@ -45,10 +44,11 @@ static cl::opt<std::string> inputFilename(cl::Positional,
 
 namespace {
 enum InputType { Pony, MLIR };
-} // namespace
+}  // namespace
 static cl::opt<enum InputType> inputType(
     "x", cl::init(Pony), cl::desc("Decided the kind of output desired"),
-    cl::values(clEnumValN(Pony, "pony", "load the input file as a Pony source.")),
+    cl::values(clEnumValN(Pony, "pony",
+                          "load the input file as a Pony source.")),
     cl::values(clEnumValN(MLIR, "mlir",
                           "load the input file as an MLIR file")));
 
@@ -63,7 +63,7 @@ enum Action {
   DumpLLVMIR,
   RunJIT
 };
-} // namespace
+}  // namespace
 static cl::opt<enum Action> emitAction(
     "emit", cl::desc("Select the kind of output desired"),
     cl::values(clEnumValN(DumpToken, "token", "output the token dump")),
@@ -100,8 +100,7 @@ int loadMLIR(mlir::MLIRContext &context,
   if (inputType != InputType::MLIR &&
       !llvm::StringRef(inputFilename).endswith(".mlir")) {
     auto moduleAST = parseInputFile(inputFilename);
-    if (!moduleAST)
-      return 6;
+    if (!moduleAST) return 6;
     module = mlirGen(context, *moduleAST);
     return !module ? 1 : 0;
   }
@@ -127,8 +126,7 @@ int loadMLIR(mlir::MLIRContext &context,
 
 int loadAndProcessMLIR(mlir::MLIRContext &context,
                        mlir::OwningOpRef<mlir::ModuleOp> &module) {
-  if (int error = loadMLIR(context, module))
-    return error;
+  if (int error = loadMLIR(context, module)) return error;
 
   mlir::PassManager pm(&context);
   // Apply any generic pass manager command line options and run the pipeline.
@@ -171,8 +169,7 @@ int loadAndProcessMLIR(mlir::MLIRContext &context,
     pm.addPass(mlir::pony::createLowerToLLVMPass());
   }
 
-  if (mlir::failed(pm.run(*module)))
-    return 4;
+  if (mlir::failed(pm.run(*module))) return 4;
   return 0;
 }
 // TODO:补充“词法分析器正确性”验证程序int dumpToken()
@@ -191,18 +188,17 @@ int dumpToken() {
   // 初始化lexer
   LexerBuffer lexer(buffer.begin(), buffer.end(), std::string(inputFilename));
 
-  lexer.getNextToken(); // prime the lexer
+  lexer.getNextToken();  // prime the lexer
 
   // TODO: 使用lexer遍历整个文档，最终按顺序输出识别到的每一种Token
   //       具体输出格式可参考大作业文档中给出的示例。
-  /* 
-    *
-    *  Write your code here.
-    *
-    */
+  /*
+   *
+   *  Write your code here.
+   *
+   */
   return 0;
 }
-
 
 int dumpAST() {
   if (inputType == InputType::MLIR) {
@@ -211,8 +207,7 @@ int dumpAST() {
   }
 
   auto moduleAST = parseInputFile(inputFilename);
-  if (!moduleAST)
-    return 1;
+  if (!moduleAST) return 1;
 
   dump(*moduleAST);
   return 0;
@@ -287,12 +282,9 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(argc, argv, "pony compiler\n");
 
+  if (emitAction == Action::DumpToken) return dumpToken();
 
-  if (emitAction == Action::DumpToken)
-    return dumpToken();
-
-  if (emitAction == Action::DumpAST)
-    return dumpAST();
+  if (emitAction == Action::DumpAST) return dumpAST();
 
   // If we aren't dumping the AST, then we are compiling with/to MLIR.
 
@@ -301,8 +293,7 @@ int main(int argc, char **argv) {
   context.getOrLoadDialect<mlir::pony::PonyDialect>();
 
   mlir::OwningOpRef<mlir::ModuleOp> module;
-  if (int error = loadAndProcessMLIR(context, module))
-    return error;
+  if (int error = loadAndProcessMLIR(context, module)) return error;
 
   // If we aren't exporting to non-mlir, then we are done.
   bool isOutputingMLIR = emitAction <= Action::DumpMLIRLLVM;
@@ -312,12 +303,10 @@ int main(int argc, char **argv) {
   }
 
   // Check to see if we are compiling to LLVM IR.
-  if (emitAction == Action::DumpLLVMIR)
-    return dumpLLVMIR(*module);
+  if (emitAction == Action::DumpLLVMIR) return dumpLLVMIR(*module);
 
   // Otherwise, we must be running the jit.
-  if (emitAction == Action::RunJIT)
-    return runJit(*module);
+  if (emitAction == Action::RunJIT) return runJit(*module);
 
   llvm::errs() << "No action specified (parsing only?), use -emit=<action>\n";
   return -1;
