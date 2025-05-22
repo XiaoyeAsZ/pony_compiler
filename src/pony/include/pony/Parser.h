@@ -1,4 +1,5 @@
-//===- Parser.h - Pony Language Parser -------------------------------------===//
+//===- Parser.h - Pony Language Parser
+//-------------------------------------===//
 //
 //===----------------------------------------------------------------------===//
 //
@@ -10,17 +11,16 @@
 #ifndef PONY_PARSER_H
 #define PONY_PARSER_H
 
-#include "pony/AST.h"
-#include "pony/Lexer.h"
+#include <map>
+#include <utility>
+#include <vector>
 
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include <map>
-#include <utility>
-#include <vector>
+#include "pony/AST.h"
+#include "pony/Lexer.h"
 
 namespace pony {
 
@@ -30,20 +30,19 @@ namespace pony {
 /// string and the code could reference an undeclared variable and the parsing
 /// succeeds.
 class Parser {
-public:
+ public:
   /// Create a Parser for the supplied lexer.
   Parser(Lexer &lexer) : lexer(lexer) {}
 
   /// Parse a full Module. A module is a list of function definitions.
   std::unique_ptr<ModuleAST> parseModule() {
-    lexer.getNextToken(); // prime the lexer
+    lexer.getNextToken();  // prime the lexer
 
     // Parse functions one at a time and accumulate in this vector.
     std::vector<FunctionAST> functions;
     while (auto f = parseDefinition()) {
       functions.push_back(std::move(*f));
-      if (lexer.getCurToken() == tok_eof)
-        break;
+      if (lexer.getCurToken() == tok_eof) break;
     }
     // If we didn't reach EOF, there was an error during parsing
     if (lexer.getCurToken() != tok_eof)
@@ -52,7 +51,7 @@ public:
     return std::make_unique<ModuleAST>(std::move(functions));
   }
 
-private:
+ private:
   Lexer &lexer;
 
   /// Parse a function definition, we expect a prototype initiated with the
@@ -61,8 +60,7 @@ private:
   /// definition ::= prototype block
   std::unique_ptr<FunctionAST> parseDefinition() {
     auto proto = parsePrototype();
-    if (!proto)
-      return nullptr;
+    if (!proto) return nullptr;
 
     if (auto block = parseBlock())
       return std::make_unique<FunctionAST>(std::move(proto), std::move(block));
@@ -70,8 +68,8 @@ private:
   }
 
   // Parse a function prototype, which is represented as:
-  //        prototype ::= def id '(' decl_list ')'   
-  //        decl_list ::= identifier | identifier, decl_list                    
+  //        prototype ::= def id '(' decl_list ')'
+  //        decl_list ::= identifier | identifier, decl_list
   std::unique_ptr<PrototypeAST> parsePrototype() {
     auto loc = lexer.getLastLocation();
 
@@ -97,8 +95,7 @@ private:
         lexer.consume(tok_identifier);
         auto decl = std::make_unique<VariableExprAST>(std::move(loc), name);
         args.push_back(std::move(decl));
-        if (lexer.getCurToken() != ',')
-          break;
+        if (lexer.getCurToken() != ',') break;
         lexer.consume(Token(','));
         if (lexer.getCurToken() != tok_identifier)
           return parseError<PrototypeAST>(
@@ -130,28 +127,25 @@ private:
     auto exprList = std::make_unique<ExprASTList>();
 
     // Ignore empty expressions: swallow sequences of semicolons.
-    while (lexer.getCurToken() == ';')
-      lexer.consume(Token(';'));
+    while (lexer.getCurToken() == ';') lexer.consume(Token(';'));
 
     while (lexer.getCurToken() != '}' && lexer.getCurToken() != tok_eof) {
-      // In pony_compiler, we focus on the implementation of variable declaration and general expression.
+      // In pony_compiler, we focus on the implementation of variable
+      // declaration and general expression.
       if (lexer.getCurToken() == tok_var) {
         // Variable declaration
         auto varDecl = parseDeclaration();
-        if (!varDecl)
-          return nullptr;
+        if (!varDecl) return nullptr;
         exprList->push_back(std::move(varDecl));
       } else if (lexer.getCurToken() == tok_return) {
         // Return statement
         auto ret = parseReturn();
-        if (!ret)
-          return nullptr;
+        if (!ret) return nullptr;
         exprList->push_back(std::move(ret));
       } else {
         // General expression
         auto expr = parseExpression();
-        if (!expr)
-          return nullptr;
+        if (!expr) return nullptr;
         exprList->push_back(std::move(expr));
       }
       // Ensure that elements are separated by a semicolon.
@@ -159,8 +153,7 @@ private:
         return parseError<ExprASTList>(";", "after expression");
 
       // Ignore empty expressions: swallow sequences of semicolons.
-      while (lexer.getCurToken() == ';')
-        lexer.consume(Token(';'));
+      while (lexer.getCurToken() == ';') lexer.consume(Token(';'));
     }
 
     if (lexer.getCurToken() != '}')
@@ -171,71 +164,74 @@ private:
   }
 
   // Parse a variable declaration, decl ::= var identifier [ type ] = expr
-  // 1. it starts with a `var` keyword, followed by a variable name and initialization
+  // 1. it starts with a `var` keyword, followed by a variable name and
+  // initialization
   // 2. Two methods of initialization have been supported:
   //    (1) var a = [[1, 2, 3], [4, 5, 6]];
-  //    (2) var a <2,3> = [1, 2, 3, 4, 5, 6];
+  //    (2) var a<2,3> = [1, 2, 3, 4, 5, 6];
   // You need to support the third method:
-  //    (3) var<2,3> a = [1, 2, 3, 4, 5, 6] 
+  //    (3) var a[2][3] = [1, 2, 3, 4, 5, 6]
   // Some functions may be useful:  getLastLocation(); getNextToken();
   std::unique_ptr<VarDeclExprAST> parseDeclaration() {
     auto loc = lexer.getLastLocation();
     std::string id;
 
-    
-    // ******* TODO: Here we provide implementation hints for the first two methods of initialization *******
-    // ******* Note that you need to consider a new method that implements all three types of initialization *******
+    // ******* TODO: Here we provide implementation hints for the first two
+    // methods of initialization *******
+    // ******* Note that you need to consider a new method that implements all
+    // three types of initialization *******
 
-    // TODO: check to see if this is a 'var' declaration 
-    //       If not, report the error with 'parseError', otherwise eat 'var'  
-    /* 
+    // TODO: check to see if this is a 'var' declaration
+    //       If not, report the error with 'parseError', otherwise eat 'var'
+    /*
      *
      *  Write your code here.
      *
      */
 
     // TODO: check to see if this is a variable name(identifier)
-    //       If not, report the error with 'parseError', otherwise eat the variable name
-    /* 
+    //       If not, report the error with 'parseError', otherwise eat the
+    //       variable name
+    /*
      *
      *  Write your code here.
      *
      */
 
-    std::unique_ptr<VarType> type; // Type is optional, it can be inferred
+    // TODO: modify code to support definition type (3)
+    std::unique_ptr<VarType> type;  // Type is optional, it can be inferred
     if (lexer.getCurToken() == '<') {
       type = parseType();
-      if (!type)
-        return nullptr;
+      if (!type) return nullptr;
     }
 
-    if (!type)
-      type = std::make_unique<VarType>();
+    if (!type) type = std::make_unique<VarType>();
     lexer.consume(Token('='));
     auto expr = parseExpression();
     return std::make_unique<VarDeclExprAST>(std::move(loc), std::move(id),
                                             std::move(*type), std::move(expr));
   }
 
-  /// type ::= < shape_list >
-  /// shape_list ::= num | num , shape_list
+  // TODO: modify code to support definition type (3)
+  //       Your parser is required to parse type like [2][3]
+  //       Store shape info in the variable "type" like example code
+  //       Error report should be clear for each definition type
   std::unique_ptr<VarType> parseType() {
     if (lexer.getCurToken() != '<')
       return parseError<VarType>("<", "to begin type");
-    lexer.getNextToken(); // eat <
+    lexer.getNextToken();  // eat <
 
     auto type = std::make_unique<VarType>();
 
     while (lexer.getCurToken() == tok_number) {
       type->shape.push_back(lexer.getValue());
       lexer.getNextToken();
-      if (lexer.getCurToken() == ',')
-        lexer.getNextToken();
+      if (lexer.getCurToken() == ',') lexer.getNextToken();
     }
 
     if (lexer.getCurToken() != '>')
       return parseError<VarType>(">", "to end type");
-    lexer.getNextToken(); // eat >
+    lexer.getNextToken();  // eat >
     return type;
   }
 
@@ -249,18 +245,17 @@ private:
     llvm::Optional<std::unique_ptr<ExprAST>> expr;
     if (lexer.getCurToken() != ';') {
       expr = parseExpression();
-      if (!expr)
-        return nullptr;
+      if (!expr) return nullptr;
     }
     return std::make_unique<ReturnExprAST>(std::move(loc), std::move(expr));
   }
 
-  /// 解析函数内的表达式语句expression，其形式为：expression::= primary binop rhs
+  /// 解析函数内的表达式语句expression，其形式为：expression::= primary binop
+  /// rhs
   std::unique_ptr<ExprAST> parseExpression() {
     /// 解析"="右边第一项：primary
     auto lhs = parsePrimary();
-    if (!lhs)
-      return nullptr;
+    if (!lhs) return nullptr;
     /// 解析剩余的项，可能有多种情况：
     /// 1. binop rhs
     /// 2. 无剩余项，直接返回primary对应的AST
@@ -274,39 +269,43 @@ private:
   ///   ::= tensorliteral
   std::unique_ptr<ExprAST> parsePrimary() {
     switch (lexer.getCurToken()) {
-    default:
-      llvm::errs() << "unknown token '" << lexer.getCurToken()
-                   << "' when expecting an expression\n";
-      return nullptr;
-    // 解析标识符与函数调用，并返回相应AST
-    case tok_identifier:
-      return parseIdentifierExpr();
-    // 解析数字，并返回相应AST
-    case tok_number:
-      return parseNumberExpr();
-    // 解析括号表达式，并返回相应AST
-    case '(':
-      return parseParenExpr();
-    // 解析Tensor的声明，并返回相应AST。
-    case '[':
-      return parseTensorLiteralExpr();
-    case ';':
-      return nullptr;
-    case '}':
-      return nullptr;
+      default:
+        llvm::errs() << "unknown token '" << lexer.getCurToken()
+                     << "' when expecting an expression\n";
+        return nullptr;
+      // 解析标识符与函数调用，并返回相应AST
+      case tok_identifier:
+        return parseIdentifierExpr();
+      // 解析数字，并返回相应AST
+      case tok_number:
+        return parseNumberExpr();
+      // 解析括号表达式，并返回相应AST
+      case '(':
+        return parseParenExpr();
+      // 解析Tensor的声明，并返回相应AST。
+      case '[':
+        return parseTensorLiteralExpr();
+      case ';':
+        return nullptr;
+      case '}':
+        return nullptr;
     }
   }
 
-  // TODO: 解析标识符语句，其可以是简单的变量名，也可以用于函数调用。具有以下形式：
+  // TODO:
+  // 解析标识符语句，其可以是简单的变量名，也可以用于函数调用。具有以下形式：
   //             ::= identifier
   //             ::= identifier '(' expression ')'
   // Hints: 1. 可以采用lexer中的适当方法获取当前的identifier，并eat identifier；
   //        2. 判断其为标识符，普通函数调用还是内置函数print的调用；
-  //        3. 如果仅是一个变量名，则返回其对应的AST。可以使用std::make_unique<VariableExprAST>(...)；
-  //        4. 如果是函数调用，其参数列表中的参数可以通过parseExpression()逐个解析，并存放在std::vector<std::unique_ptr<ExprAST>>中。最终返回相应AST时，可以使用std::make_unique<CallExprAST>(...)；
-  //        5. 如果是print，要确保其内部只有一个参数，如果有多个参数，要输出错误信息。最终返回相应AST时，可以使用std::make_unique<PrintExprAST>(...)。
+  //        3.
+  //        如果仅是一个变量名，则返回其对应的AST。可以使用std::make_unique<VariableExprAST>(...)；
+  //        4.
+  //        如果是函数调用，其参数列表中的参数可以通过parseExpression()逐个解析，并存放在std::vector<std::unique_ptr<ExprAST>>中。最终返回相应AST时，可以使用std::make_unique<CallExprAST>(...)；
+  //        5.
+  //        如果是print，要确保其内部只有一个参数，如果有多个参数，要输出错误信息。最终返回相应AST时，可以使用std::make_unique<PrintExprAST>(...)。
   std::unique_ptr<ExprAST> parseIdentifierExpr() {
-    /* 
+    /*
      *
      *  Write your code here.
      *
@@ -324,12 +323,12 @@ private:
   }
 
   // parse parenexpr ::= '(' expression ')'
-  // The whole process can be divided into three steps: 1) eat '(' ; 2) parse 'expression' ; 3) eat ')' .
+  // The whole process can be divided into three steps: 1) eat '(' ; 2) parse
+  // 'expression' ; 3) eat ')' .
   std::unique_ptr<ExprAST> parseParenExpr() {
-    lexer.getNextToken(); // eat (.
+    lexer.getNextToken();  // eat (.
     auto v = parseExpression();
-    if (!v)
-      return nullptr;
+    if (!v) return nullptr;
 
     if (lexer.getCurToken() != ')')
       return parseError<ExprAST>(")", "to close expression with parentheses");
@@ -352,8 +351,7 @@ private:
       // We can have either another nested array or a number literal.
       if (lexer.getCurToken() == '[') {
         values.push_back(parseTensorLiteralExpr());
-        if (!values.back())
-          return nullptr; // parse error in the nested array.
+        if (!values.back()) return nullptr;  // parse error in the nested array.
       } else {
         if (lexer.getCurToken() != tok_number)
           return parseError<ExprAST>("<num> or [", "in literal expression");
@@ -361,18 +359,17 @@ private:
       }
 
       // End of this list on ']'
-      if (lexer.getCurToken() == ']')
-        break;
+      if (lexer.getCurToken() == ']') break;
 
       // Elements are separated by a comma.
       if (lexer.getCurToken() != ',')
         return parseError<ExprAST>("] or ,", "in literal expression");
 
-      lexer.getNextToken(); // eat ,
+      lexer.getNextToken();  // eat ,
     } while (true);
     if (values.empty())
       return parseError<ExprAST>("<something>", "to fill literal expression");
-    lexer.getNextToken(); // eat ]
+    lexer.getNextToken();  // eat ]
 
     /// Fill in the dimensions now. First the current nesting level:
     dims.push_back(values.size());
@@ -409,41 +406,45 @@ private:
   // Get the precedence of the pending binary operator token.
   // TODO: 增加矩阵乘法@的支持，其优先级与矩阵点乘*相同：
   int getTokPrecedence() {
-    if (!isascii(lexer.getCurToken()))
-      return -1;
+    if (!isascii(lexer.getCurToken())) return -1;
 
     // Currently we consider three binary operators: '+', '-', '*'.
-    // Note that the smaller the number is, the lower precedence it will have. 
+    // Note that the smaller the number is, the lower precedence it will have.
     switch (static_cast<char>(lexer.getCurToken())) {
-    case '-':
-      return 20;
-    case '+':
-      return 20;
-    case '*':
-      return 40;
-    default:
-      return -1;
+      case '-':
+        return 20;
+      case '+':
+        return 20;
+      case '*':
+        return 40;
+      default:
+        return -1;
     }
   }
 
-  // TODO 1）: Recursively parse the right hand side of a binary expression, 
-  //       for example, it could be something like  '+' primary '-' primary  or  ('+' primary)* .
-  //       The first argument (exprPrec) indicates the precedence of the current binary operator. 
-  //       The second argument (lhs) indicates the left hand side of the expression.
+  // TODO 1）: Recursively parse the right hand side of a binary expression,
+  //       for example, it could be something like  '+' primary '-' primary  or
+  //       ('+' primary)* . The first argument (exprPrec) indicates the
+  //       precedence of the current binary operator. The second argument (lhs)
+  //       indicates the left hand side of the expression.
   // Hints  1. Implement a recursive algorithm to parse;
-  //        2. You may use some funtions in the lexer to get current and next tokens;
-  //        3. You may use some functions to help you parse: getTokPrecedence(); parsePrimary(); parseError<ExprAST>();
-  //        4. During each iteration, the lhs may be merged with rhs and becomes a larger lhs. Function you may use: std::make_unique<BinaryExprAST>(...).
+  //        2. You may use some funtions in the lexer to get current and next
+  //        tokens;
+  //        3. You may use some functions to help you parse: getTokPrecedence();
+  //        parsePrimary(); parseError<ExprAST>();
+  //        4. During each iteration, the lhs may be merged with rhs and becomes
+  //        a larger lhs. Function you may use:
+  //        std::make_unique<BinaryExprAST>(...).
   // TODO 2）: 增加矩阵乘法@的支持，其优先级与矩阵点乘*相同：
   std::unique_ptr<ExprAST> parseBinOpRHS(int exprPrec,
                                          std::unique_ptr<ExprAST> lhs) {
-    /* 
+    /*
      *
      *  Write your code here.
      *
      */
   }
-  
+
   /// Helper function to signal errors while parsing, it takes an argument
   /// indicating the expected token and another argument giving more context.
   /// Location is retrieved from the lexer to enrich the error message.
@@ -453,13 +454,12 @@ private:
     llvm::errs() << "Parse error (" << lexer.getLastLocation().line << ", "
                  << lexer.getLastLocation().col << "): expected '" << expected
                  << "' " << context << " but has Token " << curToken;
-    if (isprint(curToken))
-      llvm::errs() << " '" << (char)curToken << "'";
+    if (isprint(curToken)) llvm::errs() << " '" << (char)curToken << "'";
     llvm::errs() << "\n";
     return nullptr;
   }
 };
 
-} // namespace pony
+}  // namespace pony
 
-#endif // PONY_PARSER_H
+#endif  // PONY_PARSER_H
