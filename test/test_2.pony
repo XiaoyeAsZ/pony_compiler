@@ -1,7 +1,7 @@
 # ../build/bin/pony ../test/test_2.pony -emit=token
 
 def multiply_transpose(a, b) {
-  return transpose(a) * transpose(b);
+  retuRn transpose(a) * transpose(b);
 }
 
 def main() {
